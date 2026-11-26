@@ -1,49 +1,48 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nhấn Chuỗi Hàng Ngày</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>1277Foods | Đặt Đồ Ăn Ảo – Chỉ Vui, Không Lo Gì Cả</title>
+  <meta name="description" content="Trang web giả lập đặt đồ ăn trực tuyến: xem món, chọn món, tạo đơn hàng cho vui. Không giao hàng thật, không trả tiền thật.">
+  <meta name="theme-color" content="#e53935">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="1277Foods">
+  <meta property="og:title" content="1277Foods | Đặt Đồ Ăn Ảo – Chỉ Vui, Không Lo Gì Cả">
+  <meta property="og:description" content="Xem món ngon, chọn món, tạo đơn hàng cho vui – không giao thật, không trả tiền thật.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23e53935'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle'%3E%F0%9F%8D%9C%3C/text%3E%3C/svg%3E">
+  <script>
+    /* Áp dụng giao diện & cỡ chữ ngay khi mở trang (tránh nhấp nháy) */
+    (function () {
+      try {
+        var s = JSON.parse(localStorage.getItem('1277foods.v1') || localStorage.getItem('1277foods.v1.bak') || '{}');
+        var t = s.theme || 'system';
+        var dark = t === 'dark' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        if (s.fontScale) document.documentElement.style.setProperty('--fs', String(1 + s.fontScale * 0.08));
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preconnect" href="https://i.ibb.co" crossorigin>
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <div class="header">
-        <i class="fa-solid fa-link icon-main"></i>
-        <h1>Nhấn Chuỗi</h1>
-        <p class="subtitle">Mỗi ngày chỉ được nhấn 1 lần</p>
-      </div>
-
-      <div class="stats">
-        <div class="stat-item">
-          <i class="fa-solid fa-fire"></i>
-          <div>
-            <span class="label">Tổng lần nhấn</span>
-            <span id="totalClicks" class="value">0</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="countdown-box">
-        <div class="countdown-label">Thời gian còn lại</div>
-        <div id="countdown" class="countdown">--:--:--</div>
-      </div>
-
-      <button id="btnChuoi" class="btn-chuoi" disabled>
-        <i class="fa-solid fa-hand-pointer"></i>
-        <span id="btnText">Đang tải...</span>
-      </button>
-
-      <div id="message" class="message"></div>
+  <main id="app">
+    <div class="splash">
+      <div class="splash-logo">🍜</div>
+      <div class="splash-t">1277<b>Foods</b></div>
+      <div class="splash-bar"><i></i></div>
     </div>
+  </main>
 
-    <footer>
-      <p>Tự động cập nhật • Không cần tải lại trang</p>
-    </footer>
-  </div>
+  <div id="modal-root"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="script.js"></script>
+  <noscript>
+    <div class="noscript">Vui lòng bật JavaScript để dùng 1277Foods.</div>
+  </noscript>
+
+  <script src="script.js" defer></script>
 </body>
 </html>
