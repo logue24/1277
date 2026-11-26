@@ -6,7 +6,7 @@
 'use strict';
 
 /* ⬇️ DÁN ĐƯỜNG LINK APPS SCRIPT (URL ứng dụng web, đuôi /exec) VÀO GIỮA HAI DẤU NGOẶC KÉP ⬇️ */
-const SCRIPT_URL = "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4RHpUXzlXS0Nvdnc3UWQxMGI3cnRuWHJZWUNLWGh3YS1ta2dDZDJqOExvRVR0TkRabEZNQWlnSmRWaFNoX0gxTUQvZXhlYw";
+const SCRIPT_URL = "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4RHpUXzlXS0Nvdnc3UWQxMGI3cnRuWHJZWUNLWGh3YS1ta2dDZDJqOExvRVR0TkRabEZNQWlnSmRWaFNoX0gxTUQvZXhlYw==";
 /* (Có thể dán link thường, hoặc link đã mã hoá Base64 nếu không muốn lộ link.) */
 
 const APP_CACHE = '1277foods-cache-v1';
