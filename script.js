@@ -781,10 +781,9 @@ function vHome() {
         <h1 class="hero-title">1277Foods | Đặt Đồ Ăn Ảo – Chỉ Vui, Không Lo Gì Cả</h1>
         <p class="hero-desc">Trang web giả lập đặt đồ ăn trực tuyến, nơi bạn tự do xem món, chọn món và tạo đơn hàng theo ý thích. <strong>Hoàn toàn không có giao hàng thật, không có trả tiền thật, không phát sinh chi phí hay nghĩa vụ nào.</strong> Được xây dựng riêng để <strong>thỏa mãn nhu cầu tinh thần:</strong> giải tỏa cơn thèm, thỏa thích xem món ngon, tưởng tượng thưởng thức hay đơn giản chỉ có vài phút trải nghiệm vui vẻ, thoải mái và hoàn toàn không có gánh nặng nào.</p>
       </div>
-      <div class="visits" aria-live="polite">
-        <div class="v-top">${ic('eye')} Lượt truy cập</div>
+      <div class="visits" role="status" aria-label="Lượt truy cập">
+        <div class="v-top">${ic('eye')}</div>
         <div class="v-num" id="vNum">${S.lastCount == null ? '—' : Number(S.lastCount).toLocaleString('vi-VN')}</div>
-        <div class="v-st" id="vSt">${visitStatusHtml()}</div>
       </div>
     </section>
 
