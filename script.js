@@ -6,10 +6,10 @@
 'use strict';
 
 /* ⬇️ DÁN ĐƯỜNG LINK APPS SCRIPT (URL ứng dụng web, đuôi /exec) VÀO GIỮA HAI DẤU NGOẶC KÉP ⬇️ */
-const SCRIPT_URL = "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4RHpUXzlXS0Nvdnc3UWQxMGI3cnRuWHJZWUNLWGh3YS1ta2dDZDJqOExvRVR0TkRabEZNQWlnSmRWaFNoX0gxTUQvZXhlYw==";
+const SCRIPT_URL = "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6UU9SZjZ5SVdyN0lxUkw0UE1OeGk5RkwySWdVS0MwcjBocFF0TVdMSlVxR2xXbEU4aDRaU2JPalZabzlTeWRsWS9leGVj";
 /* (Có thể dán link thường, hoặc link đã mã hoá Base64 nếu không muốn lộ link.) */
 
-const APP_CACHE = '1277foods-cache-v1';
+const APP_CACHE = '1277foods-cache-v2';
 
 if (typeof window === 'undefined') {
   /* ================= SERVICE WORKER (chạy nền, offline) ================= */
@@ -88,17 +88,77 @@ if (typeof window === 'undefined') {
     }
   });
 
+  /* ---------- Dữ liệu đơn hàng dùng chung giữa trang và Service Worker ---------- */
+  const DATA_CACHE = '1277foods-data';
+  const dataUrl = (name) => new URL(name, self.registration.scope).href;
+  const readData = async (name, def) => {
+    try { const c = await caches.open(DATA_CACHE); const r = await c.match(dataUrl(name)); return r ? await r.json() : def; } catch (err) { return def; }
+  };
+  const writeData = async (name, val) => {
+    try { const c = await caches.open(DATA_CACHE); await c.put(dataUrl(name), new Response(JSON.stringify(val), { headers: { 'Content-Type': 'application/json' } })); } catch (err) { /* bỏ qua */ }
+  };
+  /* Đường link đẹp của trang (KHÔNG BAO GIỜ mở script.js) */
+  const appUrl = (hash) => self.registration.scope + (hash || '');
+  const orderNotif = (o, silent) => ({
+    body: `Đơn #${o.code}: ${o.name || 'Món ăn'}${o.more > 0 ? ` và ${o.more} món khác` : ''} đã giao thành công tới Nhà mình. Chúc bạn ngon miệng! 😋`,
+    icon: o.img || undefined,
+    image: o.img || undefined,
+    tag: 'order-' + o.code,
+    renotify: !silent,
+    silent: !!silent,
+    vibrate: silent ? undefined : [120, 60, 120],
+    timestamp: o.at,
+    data: { url: appUrl('#/order/' + o.code) }
+  });
+
+  /* ---------- Thông báo đẩy: hiện cả khi đã thoát trình duyệt ---------- */
+  self.addEventListener('push', (e) => {
+    e.waitUntil((async () => {
+      const orders = await readData('__orders.json', []);
+      const done = await readData('__notified.json', []);
+      const t = Date.now();
+      /* 1) Đơn đã tới giờ giao mà chưa báo */
+      let due = orders.filter((o) => !done.includes(o.code) && o.at <= t + 30000).sort((a, b) => a.at - b.at);
+      let silent = false;
+      if (!due.length) {
+        /* 2) Đơn vừa giao đã được báo (trang đang mở tự báo rồi) → chỉ thay thế lặng lẽ, không kêu lần 2 */
+        const last = orders.filter((o) => o.at <= t + 30000 && t - o.at < 900000).sort((a, b) => b.at - a.at)[0];
+        if (last) { due = [last]; silent = true; }
+      }
+      /* 3) Lệch đồng hồ thiết bị: lấy đơn sắp giao sớm nhất */
+      if (!due.length) due = orders.filter((o) => !done.includes(o.code)).sort((a, b) => a.at - b.at).slice(0, 1);
+      if (!due.length) {
+        await self.registration.showNotification('1277Foods – Giao hàng thành công ✅', {
+          body: 'Đơn hàng của bạn đã giao thành công tới Nhà mình. Chúc bạn ngon miệng! 😋',
+          tag: '1277foods-order', data: { url: appUrl('#/orders') }
+        });
+        return;
+      }
+      for (const o of due) {
+        await self.registration.showNotification('1277Foods – Giao hàng thành công ✅', orderNotif(o, silent));
+        if (!done.includes(o.code)) done.push(o.code);
+      }
+      await writeData('__notified.json', done.slice(-200));
+    })());
+  });
+
+  /* ---------- Chạm vào thông báo → mở đúng trang đơn hàng ---------- */
   self.addEventListener('notificationclick', (e) => {
     e.notification.close();
-    const target = (e.notification.data && e.notification.data.url) || './';
-    e.waitUntil(
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-        for (const c of list) {
-          if ('focus' in c) { if ('navigate' in c && target !== './') c.navigate(target).catch(() => {}); return c.focus(); }
-        }
-        return self.clients.openWindow ? self.clients.openWindow(target) : null;
-      })
-    );
+    const scope = self.registration.scope;
+    let target = (e.notification.data && e.notification.data.url) || '';
+    try { target = new URL(target.startsWith('#') ? scope + target : target, scope).href; } catch (err) { target = scope; }
+    if (!target.startsWith(scope) || /\/(script\.js|style\.css)/.test(target)) target = scope;
+    e.waitUntil((async () => {
+      const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const c of list) {
+        if (!c.url.startsWith(scope)) continue;
+        try {
+          if (c.navigate) { const nc = await c.navigate(target); if (nc && nc.focus) await nc.focus(); else if (c.focus) await c.focus(); return; }
+        } catch (err) { /* thử mở cửa sổ mới */ }
+      }
+      if (self.clients.openWindow) await self.clients.openWindow(target);
+    })());
   });
 } else {
 (function () {
@@ -646,7 +706,7 @@ function opt(act, v, label, on, icon = '', style = '') {
 function notifHtml() {
   if (!('Notification' in window)) return `${ic('bell')}<span>Trình duyệt này không hỗ trợ thông báo</span>`;
   const p = Notification.permission;
-  if (p === 'granted') return `${ic('bell')}<span>Thông báo giao hàng</span><b class="notif-ok">Đã bật ✓</b>`;
+  if (p === 'granted') return `${ic('bell')}<span>Thông báo giao hàng${('PushManager' in window) ? ' – báo cả khi đã thoát trình duyệt' : ''}</span><b class="notif-ok">Đã bật ✓</b>`;
   if (p === 'denied') return `${ic('bell')}<span>Thông báo đang bị chặn – mở cài đặt trang web của trình duyệt để cho phép</span>`;
   return `${ic('bell')}<span>Nhận thông báo khi giao hàng thành công</span><button data-act="notif">Bật</button>`;
 }
@@ -1012,7 +1072,8 @@ function placeOrder() {
   S.checkout = null;
   save();
   updateBadges();
-  askNotif();
+  syncSwData();
+  askNotif().then(() => schedulePush(order));
   go('#/order/' + code, { replace: true });
   toast('Đặt hàng thành công! Đang chờ quán xác nhận…');
 }
@@ -1659,15 +1720,97 @@ async function askNotif() {
   } catch (e) { /* bỏ qua */ }
   const row = $('#notifRow'); if (row) row.innerHTML = notifHtml();
 }
-function swReg() {
+function swReg(waitActive) {
   if (!('serviceWorker' in navigator)) return Promise.resolve(null);
-  return Promise.race([navigator.serviceWorker.getRegistration().catch(() => null), new Promise((r) => setTimeout(() => r(null), 1500))]);
+  const p = waitActive ? navigator.serviceWorker.ready : navigator.serviceWorker.getRegistration();
+  return Promise.race([Promise.resolve(p).catch(() => null), new Promise((r) => setTimeout(() => r(null), waitActive ? 6000 : 1500))]);
 }
-async function notify(title, body, icon, url) {
+/* Đường link đẹp của trang (thư mục chứa index.html) — không bao giờ trỏ tới script.js */
+const appBase = () => location.origin + location.pathname.replace(/[^/]*$/, '');
+async function notify(title, opts) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const opts = { body, icon, badge: icon, tag: 'order-' + url, renotify: true, vibrate: [120, 60, 120], data: { url } };
   try { const reg = await swReg(); if (reg && reg.showNotification) { await reg.showNotification(title, opts); return; } } catch (e) { /* thử cách khác */ }
   try { new Notification(title, opts); } catch (e) { /* bỏ qua */ }
+}
+function orderNotifOpts(o) {
+  const first = o.items[0] || {};
+  const more = o.items.length - 1;
+  return {
+    body: `Đơn #${o.code}: ${first.name || 'Món ăn'}${more > 0 ? ` và ${more} món khác` : ''} đã giao thành công tới Nhà mình. Chúc bạn ngon miệng! 😋`,
+    icon: first.img, image: first.img, tag: 'order-' + o.code, renotify: true,
+    vibrate: [120, 60, 120], timestamp: o.created + o.t3,
+    data: { url: appBase() + '#/order/' + o.code }
+  };
+}
+
+/* ---------- Dữ liệu dùng chung với Service Worker (để báo khi đã thoát trình duyệt) ---------- */
+const DATA_CACHE = '1277foods-data';
+async function readData(name, def) {
+  try { if (!('caches' in window)) return def; const c = await caches.open(DATA_CACHE); const r = await c.match(appBase() + name); return r ? await r.json() : def; } catch (e) { return def; }
+}
+async function writeData(name, val) {
+  try { if (!('caches' in window)) return; const c = await caches.open(DATA_CACHE); await c.put(appBase() + name, new Response(JSON.stringify(val), { headers: { 'Content-Type': 'application/json' } })); } catch (e) { /* bỏ qua */ }
+}
+function syncSwData() {
+  const cutoff = now() - 86400000;
+  return writeData('__orders.json', S.orders.filter((o) => o.created + o.t3 > cutoff).map((o) => {
+    const first = o.items[0] || {};
+    return { code: o.code, at: o.created + o.t3, name: first.name || '', more: o.items.length - 1, img: first.img || '', total: o.total };
+  }));
+}
+async function markNotified(code) {
+  const done = await readData('__notified.json', []);
+  if (done.includes(code)) return false;
+  done.push(code);
+  await writeData('__notified.json', done.slice(-200));
+  return true;
+}
+
+/* ---------- Thông báo đẩy (Web Push qua Apps Script) ---------- */
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+function b64uBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function getVapid() {
+  /* Đổi link Apps Script → lấy lại khoá mới (tránh lệch khoá thông báo) */
+  if (S.vapid && S.vapidSrc === scriptUrl()) return S.vapid;
+  const j = await callScript({ action: 'vapid' });
+  if (j && typeof j.key === 'string' && /^[A-Za-z0-9_-]{80,100}$/.test(j.key)) { S.vapid = j.key; S.vapidSrc = scriptUrl(); save(); return j.key; }
+  return null;
+}
+async function ensurePush() {
+  if (!pushSupported() || Notification.permission !== 'granted' || !scriptUrl() || !navigator.onLine) return null;
+  const reg = await swReg(true);
+  if (!reg || !reg.pushManager) return null;
+  const key = await getVapid();
+  if (!key) return null;
+  let sub = await reg.pushManager.getSubscription();
+  if (sub && S.pushKey !== key) { try { await sub.unsubscribe(); } catch (e) { /* bỏ qua */ } sub = null; }
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(key) });
+    S.pushKey = key; save();
+  }
+  return sub;
+}
+async function schedulePush(o) {
+  try {
+    await syncSwData();
+    const sub = await ensurePush();
+    if (!sub || !sub.endpoint) return false;
+    const wait = Math.max(0, o.created + o.t3 - now());
+    const u = scriptUrl();
+    const qs = new URLSearchParams({ action: 'schedule', code: o.code, wait: String(wait), ep: sub.endpoint, site: location.origin }).toString();
+    fetch(u + (u.includes('?') ? '&' : '?') + qs, { method: 'GET', cache: 'no-store', keepalive: true, redirect: 'follow' }).catch(() => {});
+    o.pushed = true; save();
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 /* ---------- Lượt truy cập (Google Sheets) ---------- */
@@ -1900,7 +2043,7 @@ const ACT = {
   },
   notif: async () => {
     await askNotif();
-    if (Notification.permission === 'granted') toast('Đã bật thông báo giao hàng');
+    if (Notification.permission === 'granted') { toast('Đã bật thông báo giao hàng'); ensurePush().then(pushPending); }
     else if (Notification.permission === 'denied') toast('Thông báo đang bị chặn trong cài đặt trình duyệt', true);
   },
   share: () => sharePage(),
@@ -2010,13 +2153,19 @@ function checkOrders() {
   S.orders.forEach((o) => {
     if (!o.notified && stageOf(o) === 3) {
       o.notified = true; changed = true;
-      const first = o.items[0] || {};
-      notify('1277Foods – Giao hàng thành công ✅', `Đơn #${o.code} đã giao thành công tới Nhà mình. Chúc bạn ngon miệng! 😋`, first.img, '#/order/' + o.code);
+      const late = now() - (o.created + o.t3) > 20000;
+      /* Nếu Service Worker đã báo đúng giờ (lúc bạn thoát trình duyệt) thì không báo lại */
+      markNotified(o.code).then((isNew) => {
+        if (isNew && (!late || document.visibilityState === 'hidden')) notify('1277Foods – Giao hàng thành công ✅', orderNotifOpts(o));
+      });
       if (curRoute === '#/order/' + o.code) confetti();
       else toast(`Đơn #${o.code} đã giao thành công!`);
     }
   });
-  if (changed) { save(); updateBadges(); }
+  if (changed) { save(); updateBadges(); syncSwData(); }
+}
+function pushPending() {
+  activeOrders().filter((o) => !o.pushed && o.created + o.t3 - now() > 8000).forEach((o) => schedulePush(o));
 }
 function tick() {
   $$('[data-ago]').forEach((el) => { el.textContent = ago(Number(el.dataset.ago)); });
@@ -2082,10 +2231,12 @@ function init() {
 
   /* Chế độ offline: đăng ký Service Worker (chính file script.js) */
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-    navigator.serviceWorker.register('script.js').then(() => navigator.serviceWorker.ready).then((reg) => {
+    navigator.serviceWorker.register('script.js').then((r) => { try { r.update(); } catch (e) { /* bỏ qua */ } return navigator.serviceWorker.ready; }).then((reg) => {
       const urls = MENU.map((d) => d.img);
       const sw = reg.active || navigator.serviceWorker.controller;
       if (sw) sw.postMessage({ type: 'precache', urls });
+      syncSwData();
+      if ('Notification' in window && Notification.permission === 'granted') ensurePush().then(pushPending).catch(() => {});
     }).catch(() => { /* bỏ qua */ });
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
