@@ -572,3 +572,11 @@ b, strong { font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Ngôn ngữ & Tiền tệ ---------- */
+.lg-code { display: inline-grid; place-items: center; min-width: 30px; height: 22px; padding: 0 6px; margin-right: 10px; border-radius: 7px; background: var(--surface); border: 1.5px solid var(--line); font-size: .7rem; font-weight: 800; letter-spacing: .04em; color: var(--muted); vertical-align: 1px; }
+.opt.on .lg-code { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, var(--line)); }
+.fx-note { margin-top: 10px; line-height: 1.5; }
+.fx-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+:lang(ja) body, :lang(zh) body, :lang(ko) body { word-break: normal; overflow-wrap: anywhere; }
+:lang(th) .hero-desc, :lang(th) .empty p { line-height: 1.75; }
